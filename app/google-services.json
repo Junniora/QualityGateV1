@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "305455958881",
+    "project_id": "qualitygate-29460",
+    "storage_bucket": "qualitygate-29460.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:305455958881:android:04571f2f9cc100f374d320",
+        "android_client_info": {
+          "package_name": "com.example.qualitygate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAx21D86gjuRxVQcI8GaAF8abzo1sjpg5A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
