@@ -1,21 +1,40 @@
 package com.example.qualitygate.data.repository
 
+import android.net.Uri
 import com.example.qualitygate.data.model.*
 import com.example.qualitygate.data.util.MilestoneTemplates
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
+import java.util.*
 
 class ProductRepository {
     private val firestore = FirebaseFirestore.getInstance()
+    private val storage = FirebaseStorage.getInstance()
 
-    suspend fun registerProduct(product: Product): Result<String> {
+    suspend fun uploadPhotos(photoUris: List<Uri>): List<String> {
+        val downloadUrls = mutableListOf<String>()
+        for (uri in photoUris) {
+            val fileName = "products/${UUID.randomUUID()}.jpg"
+            val storageRef = storage.reference.child(fileName)
+            storageRef.putFile(uri).await()
+            val url = storageRef.downloadUrl.await().toString()
+            downloadUrls.add(url)
+        }
+        return downloadUrls
+    }
+
+    suspend fun registerProduct(product: Product, photoUris: List<Uri>): Result<String> {
         return try {
+            val imageUrls = uploadPhotos(photoUris)
             val productRef = firestore.collection("products").document()
             val newId = productRef.id
-            val newProduct = product.copy(id = newId)
+            val newProduct = product.copy(
+                id = newId,
+                photos = imageUrls
+            )
             
-            // Usamos un batch para asegurar que el producto y sus milestones se crean juntos
             val batch = firestore.batch()
             batch.set(productRef, newProduct)
 
@@ -80,6 +99,28 @@ class ProductRepository {
         return try {
             firestore.collection("milestones").document(milestone.id).set(milestone).await()
             Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun addFeedback(feedback: Feedback): Result<Unit> {
+        return try {
+            val ref = firestore.collection("feedback").document()
+            firestore.collection("feedback").document(ref.id).set(feedback.copy(id = ref.id)).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getFeedback(productId: String): Result<List<Feedback>> {
+        return try {
+            val snapshot = firestore.collection("feedback")
+                .whereEqualTo("productId", productId)
+                .orderBy("date", Query.Direction.DESCENDING)
+                .get().await()
+            Result.success(snapshot.toObjects(Feedback::class.java))
         } catch (e: Exception) {
             Result.failure(e)
         }

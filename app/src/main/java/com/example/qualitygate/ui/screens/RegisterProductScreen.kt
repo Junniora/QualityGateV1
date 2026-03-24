@@ -1,21 +1,35 @@
 package com.example.qualitygate.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
 import com.example.qualitygate.data.model.ProductClassification
 import com.example.qualitygate.ui.viewmodel.AuthViewModel
 import com.example.qualitygate.ui.viewmodel.ProductViewModel
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +42,19 @@ fun RegisterProductScreen(
     var partNumber by remember { mutableStateOf("") }
     var classification by remember { mutableStateOf(ProductClassification.NUEVO_PRODUCTO) }
     var expanded by remember { mutableStateOf(false) }
+    val selectedPhotos = remember { mutableStateListOf<Uri>() }
+    var isUploading by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempPhotoUri != null) {
+            selectedPhotos.add(tempPhotoUri!!)
+        }
+    }
 
     val currentUser by authViewModel.currentUser.collectAsState()
     val registrationState by productViewModel.registrationState.collectAsState()
@@ -60,7 +87,7 @@ fun RegisterProductScreen(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 
@@ -71,24 +98,7 @@ fun RegisterProductScreen(
                     onValueChange = { partNumber = it },
                     label = { Text("Número de Pieza") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                    )
-                )
-
-                OutlinedTextField(
-                    value = supervisorName,
-                    onValueChange = {},
-                    label = { Text("Responsable") },
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        unfocusedBorderColor = Color.Transparent
-                    )
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 ExposedDropdownMenuBox(
@@ -102,11 +112,7 @@ fun RegisterProductScreen(
                         label = { Text("Clasificación") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        shape = RoundedCornerShape(12.dp)
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
@@ -126,35 +132,75 @@ fun RegisterProductScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = { 
-                productViewModel.registerProduct(classification, partNumber, supervisorName) 
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(RoundedCornerShape(16.dp)),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            enabled = partNumber.isNotBlank() && currentUser != null
+        Text("Fotografías (Requerido: 4)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+        
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().height(120.dp)
         ) {
-            Text("Crear Producto", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+            items(selectedPhotos) { uri ->
+                Box(modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp))) {
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    IconButton(
+                        onClick = { selectedPhotos.remove(uri) },
+                        modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(bottomStart = 12.dp))
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.White)
+                    }
+                }
+            }
+            if (selectedPhotos.size < 4) {
+                item {
+                    Surface(
+                        modifier = Modifier.size(120.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        onClick = {
+                            val file = File(context.cacheDir, "temp_photo_${System.currentTimeMillis()}.jpg")
+                            tempPhotoUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            cameraLauncher.launch(tempPhotoUri!!)
+                        }
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.AddAPhoto, contentDescription = null)
+                            Text("Tomar Foto", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
         }
 
-        AnimatedVisibility(
-            visible = registrationState?.isFailure == true,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            registrationState?.exceptionOrNull()?.let {
-                Text(
-                    text = "Error: ${it.message}",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+        Spacer(modifier = Modifier.weight(1f))
+
+        if (isUploading) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+        } else {
+            Button(
+                onClick = { 
+                    isUploading = true
+                    productViewModel.registerProduct(classification, partNumber, supervisorName, selectedPhotos) 
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                enabled = partNumber.isNotBlank() && selectedPhotos.size == 4 && !isUploading
+            ) {
+                Text("Registrar e Iniciar Planeación", fontWeight = FontWeight.SemiBold)
             }
+        }
+
+        registrationState?.exceptionOrNull()?.let {
+            Text(text = "Error: ${it.message}", color = MaterialTheme.colorScheme.error)
+            isUploading = false
         }
     }
 }

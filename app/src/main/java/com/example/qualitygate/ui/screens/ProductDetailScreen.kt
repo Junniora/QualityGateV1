@@ -1,16 +1,30 @@
 package com.example.qualitygate.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.qualitygate.data.model.*
 import com.example.qualitygate.ui.viewmodel.ProductViewModel
 import com.google.firebase.Timestamp
@@ -27,6 +41,8 @@ fun ProductDetailScreen(
 ) {
     val products by productViewModel.productList.collectAsState()
     val product = products.find { it.id == productId }
+    val feedbacks by productViewModel.productFeedback.collectAsState()
+    val currentFeedback = feedbacks[productId] ?: emptyList()
     
     var milestones by remember { mutableStateOf<List<Milestone>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -40,12 +56,13 @@ fun ProductDetailScreen(
 
     LaunchedEffect(productId) {
         refreshMilestones()
+        productViewModel.fetchFeedback(productId)
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Detalle: ${product?.partNumber ?: ""}") },
+                title = { Text("P/N: ${product?.partNumber ?: ""}", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
@@ -55,103 +72,319 @@ fun ProductDetailScreen(
         }
     ) { padding ->
         if (product == null || isLoading) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
-            Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-                ProductInfoCard(product)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "Milestones (${milestones.size})", style = MaterialTheme.typography.titleLarge)
-                    if (milestones.isEmpty() && !isLoading) {
-                        TextButton(onClick = { refreshMilestones() }) {
-                            Text("Actualizar")
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item { ProductInfoSection(product) }
+
+                item {
+                    Text("Fotos del Producto", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(product.photos) { url ->
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                    items(milestones) { milestone ->
-                        MilestoneItem(milestone, userRole) { updatedMilestone ->
-                            productViewModel.updateMilestone(updatedMilestone) { success ->
-                                if (success) refreshMilestones()
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Actividades (Milestones)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = CircleShape
+                        ) {
+                            Text(
+                                "${milestones.count { it.status == MilestoneStatus.COMPLETADO }}/${milestones.size}",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
+                items(milestones) { milestone ->
+                    MilestoneCard(milestone, userRole, product.status) { updated ->
+                        productViewModel.updateMilestone(updated) { if (it) refreshMilestones() }
+                    }
+                }
+
+                item {
+                    StatusActionSection(product, userRole, milestones) { newStatus, comment ->
+                        if (comment != null) {
+                            productViewModel.addFeedback(productId, "system", comment)
+                        }
+                        productViewModel.updateProductStatus(productId, newStatus) { if (it) onBack() }
+                    }
+                }
+
+                if (currentFeedback.isNotEmpty()) {
+                    item {
+                        Text("Historial de Feedback", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                    items(currentFeedback) { fb ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(fb.comment, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    formatDate(fb.date),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
                             }
                         }
                     }
                 }
+                
+                item { Spacer(modifier = Modifier.height(24.dp)) }
             }
         }
     }
 }
 
 @Composable
-fun ProductInfoCard(product: Product) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+fun ProductInfoSection(product: Product) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "Información General", style = MaterialTheme.typography.titleMedium)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            Text("P/N: ${product.partNumber}")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    color = when(product.status) {
+                        ProductStatus.PLANNING -> Color.Gray
+                        ProductStatus.ON_GOING -> Color(0xFF2196F3)
+                        ProductStatus.COMPLETED -> Color(0xFF4CAF50)
+                        else -> MaterialTheme.colorScheme.secondary
+                    },
+                    shape = CircleShape,
+                    modifier = Modifier.size(12.dp)
+                ) {}
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(product.status.name.replace("_", " "), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             Text("Clasificación: ${product.classification.name.replace("_", " ")}")
             Text("Responsable: ${product.supervisorName}")
-            Text("Estado Actual: ${product.status.name}")
+            Text("Registrado: ${formatDate(product.registrationDate)}")
         }
     }
 }
 
 @Composable
-fun MilestoneItem(milestone: Milestone, userRole: UserRole, onUpdate: (Milestone) -> Unit) {
+fun MilestoneCard(milestone: Milestone, userRole: UserRole, productStatus: ProductStatus, onUpdate: (Milestone) -> Unit) {
     val context = LocalContext.current
-    val calendar = Calendar.getInstance()
-
+    
     fun showDatePicker(onDateSelected: (Timestamp) -> Unit) {
-        DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                val selectedCalendar = Calendar.getInstance()
-                selectedCalendar.set(year, month, dayOfMonth)
-                onDateSelected(Timestamp(selectedCalendar.time))
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        ).show()
+        val calendar = Calendar.getInstance()
+        DatePickerDialog(context, { _, y, m, d ->
+            val sel = Calendar.getInstance()
+            sel.set(y, m, d)
+            onDateSelected(Timestamp(sel.time))
+        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = when(milestone.status) {
-                MilestoneStatus.COMPLETADO -> MaterialTheme.colorScheme.primaryContainer
-                MilestoneStatus.RECHAZADO -> MaterialTheme.colorScheme.errorContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            }
+            containerColor = if (milestone.status == MilestoneStatus.COMPLETADO) 
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) 
+                else MaterialTheme.colorScheme.surface
         )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = "${milestone.order + 1}. ${milestone.name}", style = MaterialTheme.typography.bodyLarge)
-            Text(text = "Estado: ${milestone.status}", style = MaterialTheme.typography.labelSmall)
+            Text("${milestone.order + 1}. ${milestone.name}", fontWeight = FontWeight.SemiBold)
             
-            Spacer(modifier = Modifier.height(8.dp))
+            // Fechas Planeadas
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DateButton(
+                    label = "Plan Inicio",
+                    date = milestone.plannedStart,
+                    enabled = userRole == UserRole.SUPERVISOR && productStatus == ProductStatus.PLANNING,
+                    onClick = { showDatePicker { onUpdate(milestone.copy(plannedStart = it)) } }
+                )
+                DateButton(
+                    label = "Plan Fin",
+                    date = milestone.plannedEnd,
+                    enabled = userRole == UserRole.SUPERVISOR && productStatus == ProductStatus.PLANNING,
+                    onClick = { showDatePicker { onUpdate(milestone.copy(plannedEnd = it)) } }
+                )
+            }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { if (userRole == UserRole.SUPERVISOR) showDatePicker { onUpdate(milestone.copy(plannedStart = it)) } },
-                    modifier = Modifier.weight(1f),
-                    enabled = userRole == UserRole.SUPERVISOR
-                ) {
-                    Text(text = if (milestone.plannedStart != null) "Inicia: ${formatDate(milestone.plannedStart)}" else "Planear Inicio", style = MaterialTheme.typography.labelSmall)
+            // Fechas Reales (Solo en ON_GOING)
+            if (productStatus == ProductStatus.ON_GOING) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DateButton(
+                        label = "Real Inicio",
+                        date = milestone.realStart,
+                        enabled = userRole == UserRole.SUPERVISOR,
+                        onClick = { showDatePicker { onUpdate(milestone.copy(realStart = it)) } }
+                    )
+                    DateButton(
+                        label = "Real Fin",
+                        date = milestone.realEnd,
+                        enabled = userRole == UserRole.SUPERVISOR,
+                        onClick = { 
+                            showDatePicker { 
+                                val newMilestone = milestone.copy(realEnd = it, status = MilestoneStatus.COMPLETADO)
+                                onUpdate(newMilestone)
+                            } 
+                        }
+                    )
                 }
+            }
+        }
+    }
+}
 
-                OutlinedButton(
-                    onClick = { if (userRole == UserRole.SUPERVISOR) showDatePicker { onUpdate(milestone.copy(plannedEnd = it)) } },
-                    modifier = Modifier.weight(1f),
-                    enabled = userRole == UserRole.SUPERVISOR
+@Composable
+fun DateButton(label: String, date: Timestamp?, enabled: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.height(36.dp),
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            if (date != null) formatDate(date) else label,
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+fun StatusActionSection(
+    product: Product, 
+    userRole: UserRole, 
+    milestones: List<Milestone>,
+    onAction: (ProductStatus, String?) -> Unit
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    var comment by remember { mutableStateOf("") }
+    var nextStatusState by remember { mutableStateOf(ProductStatus.PLANNING) }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Agregar Comentario de Feedback") },
+            text = {
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Motivo del rechazo") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = { onAction(nextStatusState, comment); showDialog = false }) {
+                    Text("Confirmar")
+                }
+            }
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+        when {
+            // SUPERVISOR: De Planeación a Pre-Revisión
+            userRole == UserRole.SUPERVISOR && product.status == ProductStatus.PLANNING -> {
+                val allPlanned = milestones.all { it.plannedStart != null && it.plannedEnd != null }
+                Button(
+                    onClick = { onAction(ProductStatus.PRE_REVISION, null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = allPlanned
                 ) {
-                    Text(text = if (milestone.plannedEnd != null) "Fin: ${formatDate(milestone.plannedEnd)}" else "Planear Fin", style = MaterialTheme.typography.labelSmall)
+                    Text("Enviar a Pre-Revisión")
+                }
+            }
+
+            // REVISOR: Pre-Revisión (Aprobar/Rechazar planeación)
+            userRole == UserRole.REVISOR && product.status == ProductStatus.PRE_REVISION -> {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onAction(ProductStatus.ON_GOING, "Planeación aprobada") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ) {
+                        Icon(Icons.Default.Check, null); Spacer(Modifier.width(4.dp)); Text("Aprobar")
+                    }
+                    Button(
+                        onClick = { nextStatusState = ProductStatus.PLANNING; showDialog = true },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.Close, null); Spacer(Modifier.width(4.dp)); Text("Rechazar")
+                    }
+                }
+            }
+
+            // SUPERVISOR: On Going a Revisión Final
+            userRole == UserRole.SUPERVISOR && product.status == ProductStatus.ON_GOING -> {
+                val allCompleted = milestones.all { it.status == MilestoneStatus.COMPLETADO }
+                Button(
+                    onClick = { onAction(ProductStatus.FINAL_REVISION, null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = allCompleted
+                ) {
+                    Text("Enviar a Revisión Final")
+                }
+            }
+
+            // REVISOR: Revisión Final
+            userRole == UserRole.REVISOR && product.status == ProductStatus.FINAL_REVISION -> {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onAction(ProductStatus.APROBACION_FINAL, "Revisión técnica exitosa") },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Aprobar Técnica")
+                    }
+                    Button(
+                        onClick = { nextStatusState = ProductStatus.ON_GOING; showDialog = true },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Rechazar")
+                    }
+                }
+            }
+
+            // APROBADOR: Aprobación Final
+            userRole == UserRole.APROBADOR && product.status == ProductStatus.APROBACION_FINAL -> {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onAction(ProductStatus.COMPLETED, "Producto Aprobado") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ) {
+                        Text("APROBACIÓN FINAL")
+                    }
+                    Button(
+                        onClick = { nextStatusState = ProductStatus.FINAL_REVISION; showDialog = true },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Rechazar")
+                    }
                 }
             }
         }

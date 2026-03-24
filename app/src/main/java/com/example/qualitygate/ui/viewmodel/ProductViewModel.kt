@@ -1,9 +1,11 @@
 package com.example.qualitygate.ui.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.qualitygate.data.model.*
 import com.example.qualitygate.data.repository.ProductRepository
+import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -15,6 +17,9 @@ class ProductViewModel(private val repository: ProductRepository = ProductReposi
 
     private val _productList = MutableStateFlow<List<Product>>(emptyList())
     val productList: StateFlow<List<Product>> = _productList
+
+    private val _productFeedback = MutableStateFlow<Map<String, List<Feedback>>>(emptyMap())
+    val productFeedback: StateFlow<Map<String, List<Feedback>>> = _productFeedback
 
     init {
         fetchProducts()
@@ -40,19 +45,42 @@ class ProductViewModel(private val repository: ProductRepository = ProductReposi
         }
     }
 
+    fun fetchFeedback(productId: String) {
+        viewModelScope.launch {
+            val result = repository.getFeedback(productId)
+            if (result.isSuccess) {
+                val currentMap = _productFeedback.value.toMutableMap()
+                currentMap[productId] = result.getOrNull() ?: emptyList()
+                _productFeedback.value = currentMap
+            }
+        }
+    }
+
+    fun addFeedback(productId: String, userId: String, comment: String) {
+        viewModelScope.launch {
+            val feedback = Feedback(productId = productId, userId = userId, comment = comment, date = Timestamp.now())
+            val result = repository.addFeedback(feedback)
+            if (result.isSuccess) {
+                fetchFeedback(productId)
+            }
+        }
+    }
+
     fun registerProduct(
         classification: ProductClassification,
         partNumber: String,
-        supervisorName: String
+        supervisorName: String,
+        photoUris: List<Uri>
     ) {
         viewModelScope.launch {
             val product = Product(
                 classification = classification,
                 partNumber = partNumber,
                 supervisorName = supervisorName,
-                status = ProductStatus.PLANNING
+                status = ProductStatus.PLANNING,
+                registrationDate = Timestamp.now()
             )
-            val result = repository.registerProduct(product)
+            val result = repository.registerProduct(product, photoUris)
             _registrationState.value = result
             if (result.isSuccess) {
                 fetchProducts()
