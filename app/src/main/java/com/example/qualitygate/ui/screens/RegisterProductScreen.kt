@@ -5,12 +5,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -36,8 +38,8 @@ import java.io.File
 fun RegisterProductScreen(
     productViewModel: ProductViewModel,
     authViewModel: AuthViewModel,
-    modifier: Modifier = Modifier,
-    onRegistrationSuccess: (String) -> Unit
+    onRegistrationSuccess: (String) -> Unit,
+    onBack: () -> Unit
 ) {
     var partNumber by remember { mutableStateOf("") }
     var classification by remember { mutableStateOf(ProductClassification.NUEVO_PRODUCTO) }
@@ -67,140 +69,146 @@ fun RegisterProductScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Nuevo Registro",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
-            ),
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Nuevo Registro", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                
-                Text("Detalles del Producto", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    
+                    Text("Detalles del Producto", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
 
-                OutlinedTextField(
-                    value = partNumber,
-                    onValueChange = { partNumber = it },
-                    label = { Text("Número de Pieza") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded }
-                ) {
                     OutlinedTextField(
-                        value = classification.name.replace("_", " "),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Clasificación") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        value = partNumber,
+                        onValueChange = { partNumber = it },
+                        label = { Text("Número de Pieza") },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    ExposedDropdownMenu(
+
+                    ExposedDropdownMenuBox(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        onExpandedChange = { expanded = !expanded }
                     ) {
-                        ProductClassification.entries.forEach { entry ->
-                            DropdownMenuItem(
-                                text = { Text(entry.name.replace("_", " ")) },
-                                onClick = {
-                                    classification = entry
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Text("Fotografías (Requerido: 4)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
-        
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth().height(120.dp)
-        ) {
-            items(selectedPhotos) { uri ->
-                Box(modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp))) {
-                    AsyncImage(
-                        model = uri,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    IconButton(
-                        onClick = { selectedPhotos.remove(uri) },
-                        modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(bottomStart = 12.dp))
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.White)
-                    }
-                }
-            }
-            if (selectedPhotos.size < 4) {
-                item {
-                    Surface(
-                        modifier = Modifier.size(120.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        onClick = {
-                            val file = File(context.cacheDir, "temp_photo_${System.currentTimeMillis()}.jpg")
-                            tempPhotoUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                            cameraLauncher.launch(tempPhotoUri!!)
-                        }
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                        OutlinedTextField(
+                            value = classification.name.replace("_", " "),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Clasificación") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
                         ) {
-                            Icon(Icons.Default.AddAPhoto, contentDescription = null)
-                            Text("Tomar Foto", style = MaterialTheme.typography.labelSmall)
+                            ProductClassification.entries.forEach { entry ->
+                                DropdownMenuItem(
+                                    text = { Text(entry.name.replace("_", " ")) },
+                                    onClick = {
+                                        classification = entry
+                                        expanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        if (isUploading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-        } else {
-            Button(
-                onClick = { 
-                    isUploading = true
-                    productViewModel.registerProduct(classification, partNumber, supervisorName, selectedPhotos) 
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                enabled = partNumber.isNotBlank() && selectedPhotos.size == 4 && !isUploading
+            Text("Fotografías (Requerido: 4)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().height(120.dp)
             ) {
-                Text("Registrar e Iniciar Planeación", fontWeight = FontWeight.SemiBold)
+                items(selectedPhotos) { uri ->
+                    Box(modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp))) {
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = { selectedPhotos.remove(uri) },
+                            modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(bottomStart = 12.dp))
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.White)
+                        }
+                    }
+                }
+                if (selectedPhotos.size < 4) {
+                    item {
+                        Surface(
+                            modifier = Modifier.size(120.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            onClick = {
+                                val file = File(context.cacheDir, "temp_photo_${System.currentTimeMillis()}.jpg")
+                                tempPhotoUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                                cameraLauncher.launch(tempPhotoUri!!)
+                            }
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.AddAPhoto, contentDescription = null)
+                                Text("Tomar Foto", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
             }
-        }
 
-        registrationState?.exceptionOrNull()?.let {
-            Text(text = "Error: ${it.message}", color = MaterialTheme.colorScheme.error)
-            isUploading = false
+            Spacer(modifier = Modifier.weight(1f))
+
+            if (isUploading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            } else {
+                Button(
+                    onClick = { 
+                        isUploading = true
+                        productViewModel.registerProduct(classification, partNumber, supervisorName, selectedPhotos) 
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    enabled = partNumber.isNotBlank() && selectedPhotos.size == 4 && !isUploading
+                ) {
+                    Text("Registrar e Iniciar Planeación", fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            registrationState?.exceptionOrNull()?.let {
+                Text(text = "Error: ${it.message}", color = MaterialTheme.colorScheme.error)
+                isUploading = false
+            }
         }
     }
 }

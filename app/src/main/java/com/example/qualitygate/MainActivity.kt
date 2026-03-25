@@ -125,11 +125,14 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
                 RegisterScreen(
                     viewModel = authViewModel,
                     onRegisterSuccess = {
-                        navController.navigate("dashboard") {
-                            popUpTo("login") { inclusive = true }
-                        }
+                        // Al registrar con éxito, ahora RegisterScreen muestra el mensaje de verificación
+                        // y el botón de esa pantalla debe llamar a onBackToLogin para volver al login real.
                     },
-                    onBackToLogin = { navController.popBackStack() }
+                    onBackToLogin = { 
+                        navController.navigate("login") {
+                            popUpTo("register_user") { inclusive = true }
+                        }
+                    }
                 )
             }
             composable("dashboard") {
@@ -183,7 +186,8 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
                         navController.navigate("product_detail/$productId") {
                             popUpTo("register_product") { inclusive = true }
                         }
-                    }
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("profile") {

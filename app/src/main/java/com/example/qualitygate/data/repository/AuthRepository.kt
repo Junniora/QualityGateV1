@@ -50,6 +50,26 @@ class AuthRepository {
         }
     }
 
+    suspend fun updateProfile(name: String): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: throw Exception("Usuario no autenticado")
+            firestore.collection("users").document(uid).update("name", name).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updatePassword(newPass: String): Result<Unit> {
+        return try {
+            val firebaseUser = auth.currentUser ?: throw Exception("Usuario no autenticado")
+            firebaseUser.updatePassword(newPass).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun getCurrentUserUid(): String? = auth.currentUser?.uid
 
     suspend fun getUserRole(uid: String): UserRole? {

@@ -17,6 +17,9 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser
 
+    private val _updateState = MutableStateFlow<Result<Unit>?>(null)
+    val updateState: StateFlow<Result<Unit>?> = _updateState
+
     init {
         checkCurrentUser()
     }
@@ -25,13 +28,8 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
         viewModelScope.launch {
             val uid = repository.getCurrentUserUid()
             if (uid != null) {
-                val role = repository.getUserRole(uid)
-                if (role != null) {
-                    // We don't have the full User object easily without another fetch, 
-                    // but for now, we can at least fetch the doc if needed.
-                    // For simplicity, let's just trigger a re-login or fetch doc.
-                    // For now, we leave it to the user to login to ensure fresh credentials.
-                }
+                val result = repository.getUserRole(uid) // This is just a role check, ideally we'd fetch full user
+                // For simplicity in this demo, we rely on the login to set the currentUser
             }
         }
     }
@@ -56,15 +54,35 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
         viewModelScope.launch {
             val result = repository.register(cleanEmail, cleanPass, name, role)
             if (result.isSuccess) {
-                login(cleanEmail, cleanPass)
+                // After registration, we don't auto-login because of email verification
+                _authState.value = Result.success(User(name = name, email = email, role = role))
             } else {
                 _authState.value = Result.failure(result.exceptionOrNull() ?: Exception("Registration failed"))
             }
         }
     }
 
+    fun updateProfile(newName: String) {
+        viewModelScope.launch {
+            val result = repository.updateProfile(newName)
+            _updateState.value = result
+            if (result.isSuccess) {
+                _currentUser.value = _currentUser.value?.copy(name = newName)
+            }
+        }
+    }
+
+    fun updatePassword(newPass: String) {
+        viewModelScope.launch {
+            _updateState.value = repository.updatePassword(newPass)
+        }
+    }
+
+    fun clearUpdateState() {
+        _updateState.value = null
+    }
+
     fun logout() {
-        // Here we should actually sign out from Firebase
         com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
         _currentUser.value = null
         _authState.value = null
