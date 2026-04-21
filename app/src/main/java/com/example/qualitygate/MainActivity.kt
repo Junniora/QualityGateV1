@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -48,7 +46,10 @@ class MainActivity : ComponentActivity() {
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Dashboard : Screen("dashboard", "Inicio", Icons.Default.Home)
     object ProductList : Screen("product_list", "Explorar", Icons.AutoMirrored.Filled.List)
-    object PreRevision : Screen("pre_revision", "Revisión", Icons.Default.Notifications)
+    object MyProjects : Screen("my_projects", "Mis Proyectos", Icons.Default.FolderSpecial)
+    object PreRevision : Screen("pre_revision", "Revisión", Icons.Default.FactCheck)
+    object Approvals : Screen("approvals", "Validación", Icons.Default.Rule)
+    object KPIStats : Screen("kpi_stats", "KPIs", Icons.Default.BarChart)
     object Profile : Screen("profile", "Perfil", Icons.Default.Person)
 }
 
@@ -60,10 +61,18 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
     val currentDestination = navBackStackEntry?.destination
 
     val items = remember(currentUser) {
-        val list = mutableListOf(Screen.Dashboard, Screen.ProductList)
-        if (currentUser?.role == UserRole.REVISOR) {
-            list.add(Screen.PreRevision)
+        val list = mutableListOf<Screen>(Screen.Dashboard, Screen.ProductList)
+        
+        when (currentUser?.role) {
+            UserRole.SUPERVISOR -> list.add(Screen.MyProjects)
+            UserRole.REVISOR -> list.add(Screen.PreRevision)
+            UserRole.APROBADOR -> {
+                list.add(Screen.Approvals)
+                list.add(Screen.KPIStats)
+            }
+            null -> {}
         }
+        
         list.add(Screen.Profile)
         list
     }
@@ -124,10 +133,7 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
             composable("register_user") {
                 RegisterScreen(
                     viewModel = authViewModel,
-                    onRegisterSuccess = {
-                        // Al registrar con éxito, ahora RegisterScreen muestra el mensaje de verificación
-                        // y el botón de esa pantalla debe llamar a onBackToLogin para volver al login real.
-                    },
+                    onRegisterSuccess = {},
                     onBackToLogin = { 
                         navController.navigate("login") {
                             popUpTo("register_user") { inclusive = true }
@@ -158,6 +164,15 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
                     onAddProductClick = { navController.navigate("register_product") }
                 )
             }
+            composable("my_projects") {
+                MyProjectsScreen(
+                    productViewModel = productViewModel,
+                    authViewModel = authViewModel,
+                    onProductClick = { product -> 
+                        navController.navigate("product_detail/${product.id}")
+                    }
+                )
+            }
             composable("pre_revision") {
                 PreRevisionScreen(
                     productViewModel = productViewModel,
@@ -165,6 +180,17 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
                         navController.navigate("product_detail/${product.id}")
                     }
                 )
+            }
+            composable("approvals") {
+                ApprovalsScreen(
+                    productViewModel = productViewModel,
+                    onProductClick = { product -> 
+                        navController.navigate("product_detail/${product.id}")
+                    }
+                )
+            }
+            composable("kpi_stats") {
+                KPIStatsScreen(productViewModel = productViewModel)
             }
             composable(
                 route = "product_detail/{productId}",

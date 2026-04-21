@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.qualitygate.data.model.UserRole
 import com.example.qualitygate.ui.viewmodel.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,15 +32,21 @@ fun ProfileScreen(
     val updateState by authViewModel.updateState.collectAsState()
 
     var name by remember { mutableStateOf("") }
+    var selectedRole by remember { mutableStateOf(UserRole.SUPERVISOR) }
+    var roleExpanded by remember { mutableStateOf(false) }
+    
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Inicializar nombre cuando cargue el usuario
+    // Inicializar datos cuando cargue el usuario
     LaunchedEffect(user) {
-        user?.let { name = it.name }
+        user?.let { 
+            name = it.name
+            selectedRole = it.role
+        }
     }
 
     // Manejar estados de actualización
@@ -127,6 +134,73 @@ fun ProfileScreen(
                         enabled = name.isNotBlank() && name != user?.name
                     ) {
                         Text("Actualizar Nombre")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // NUEVA Sección: Cambiar Rol
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.ManageAccounts, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Configuración de Rol", fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Cambiar tu rol afectará tus permisos en el sistema.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(Modifier.height(16.dp))
+
+                    ExposedDropdownMenuBox(
+                        expanded = roleExpanded,
+                        onExpandedChange = { roleExpanded = !roleExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedRole.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Tu Rol Actual") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = roleExpanded,
+                            onDismissRequest = { roleExpanded = false }
+                        ) {
+                            UserRole.entries.forEach { entry ->
+                                DropdownMenuItem(
+                                    text = { Text(entry.name) },
+                                    onClick = {
+                                        selectedRole = entry
+                                        roleExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Button(
+                        onClick = { authViewModel.updateRole(selectedRole) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                        enabled = selectedRole != user?.role
+                    ) {
+                        Text("Cambiar Rol")
                     }
                 }
             }

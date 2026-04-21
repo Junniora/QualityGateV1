@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.qualitygate.data.model.Product
+import com.example.qualitygate.data.model.ProductClassification
 import com.example.qualitygate.data.model.ProductStatus
 import com.example.qualitygate.data.model.UserRole
 import com.example.qualitygate.ui.viewmodel.AuthViewModel
@@ -35,6 +37,7 @@ fun ProductListScreen(
     val products by productViewModel.productList.collectAsState()
     val currentUser by authViewModel.currentUser.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    var isGeneratingDemo by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -46,9 +49,38 @@ fun ProductListScreen(
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
                         ) 
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
+                    actions = {
+                        if (currentUser?.role == UserRole.SUPERVISOR) {
+                            IconButton(onClick = {
+                                isGeneratingDemo = true
+                                val demoData = listOf(
+                                    Triple("TOY-ALT-2GR-045", "TY20260420-000874", "Alternador para motor 2GR, 12V" to "Toyota"),
+                                    Triple("SUB-INJ-BOX-778", "SB20260420-5562", "Inyector para motor bóxer 2.0L" to "Subaru"),
+                                    Triple("FRD-BRK-ABS-321", "FD20260420-7781", "Módulo ABS sistema de frenos" to "Ford"),
+                                    Triple("MAZ-SNS-SKY-112", "MZ9834521", "Sensor de temperatura motor Skyactiv" to "Mazda"),
+                                    Triple("STL-TRN-AUTO-991", "STL00456789", "Componente de transmisión automática" to "Stellantis")
+                                )
+                                demoData.forEach { (pn, sn, extra) ->
+                                    productViewModel.registerProduct(
+                                        classification = ProductClassification.NUEVO_PRODUCTO,
+                                        partNumber = pn,
+                                        serialNumber = sn,
+                                        description = extra.first,
+                                        provider = extra.second,
+                                        supervisorName = currentUser?.name ?: "Demo User",
+                                        supervisorId = currentUser?.id ?: "demo_id",
+                                        photoUris = emptyList()
+                                    )
+                                }
+                                isGeneratingDemo = false
+                            }) {
+                                if (isGeneratingDemo) CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                else Icon(Icons.Default.AutoAwesome, contentDescription = "Demo Data", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
                 )
-                // Barra de búsqueda estilo iOS
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -84,7 +116,8 @@ fun ProductListScreen(
     ) { padding ->
         val filteredProducts = products.filter { 
             it.partNumber.contains(searchQuery, ignoreCase = true) || 
-            it.supervisorName.contains(searchQuery, ignoreCase = true)
+            it.supervisorName.contains(searchQuery, ignoreCase = true) ||
+            it.provider.contains(searchQuery, ignoreCase = true)
         }
 
         if (filteredProducts.isEmpty()) {
@@ -125,19 +158,19 @@ fun AppleProductItem(product: Product, onClick: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 )
                 Text(
-                    text = product.classification.name.replace("_", " "), 
+                    text = "${product.provider} | ${product.classification.name.replace("_", " ")}", 
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Responsable: ${product.supervisorName}",
+                    text = product.description,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1
                 )
             }
             
-            // Badge de estado estilo iOS
             Surface(
                 color = when(product.status) {
                     ProductStatus.PLANNING -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)

@@ -27,7 +27,7 @@ class ProductRepository {
 
     suspend fun registerProduct(product: Product, photoUris: List<Uri>): Result<String> {
         return try {
-            val imageUrls = uploadPhotos(photoUris)
+            val imageUrls = if (photoUris.isNotEmpty()) uploadPhotos(photoUris) else emptyList()
             val productRef = firestore.collection("products").document()
             val newId = productRef.id
             val newProduct = product.copy(
@@ -53,6 +53,34 @@ class ProductRepository {
             
             batch.commit().await()
             Result.success(newId)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateProduct(product: Product): Result<Unit> {
+        return try {
+            firestore.collection("products").document(product.id).set(product).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteProduct(productId: String): Result<Unit> {
+        return try {
+            val batch = firestore.batch()
+            batch.delete(firestore.collection("products").document(productId))
+            
+            // También deberíamos borrar hitos y feedback asociados
+            val milestones = firestore.collection("milestones").whereEqualTo("productId", productId).get().await()
+            milestones.documents.forEach { batch.delete(it.reference) }
+            
+            val feedback = firestore.collection("feedback").whereEqualTo("productId", productId).get().await()
+            feedback.documents.forEach { batch.delete(it.reference) }
+
+            batch.commit().await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

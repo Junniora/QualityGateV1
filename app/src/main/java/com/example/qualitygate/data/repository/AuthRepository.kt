@@ -6,10 +6,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
-class AuthRepository {
-    private val auth = FirebaseAuth.getInstance()
-    private val firestore = FirebaseFirestore.getInstance()
-
+class AuthRepository(
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+) {
     suspend fun login(email: String, pass: String): Result<User> {
         return try {
             val result = auth.signInWithEmailAndPassword(email, pass).await()
@@ -34,14 +34,12 @@ class AuthRepository {
             val result = auth.createUserWithEmailAndPassword(email, pass).await()
             val firebaseUser = result.user ?: throw Exception("Fallo en el registro")
             
-            // Enviar correo de verificación
             firebaseUser.sendEmailVerification().await()
             
             val uid = firebaseUser.uid
             val user = User(id = uid, name = name, email = email, role = role)
             firestore.collection("users").document(uid).set(user).await()
             
-            // Cerramos sesión después de registrar para que tengan que verificar el correo
             auth.signOut()
 
             Result.success(Unit)
@@ -54,6 +52,16 @@ class AuthRepository {
         return try {
             val uid = auth.currentUser?.uid ?: throw Exception("Usuario no autenticado")
             firestore.collection("users").document(uid).update("name", name).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateRole(newRole: UserRole): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: throw Exception("Usuario no autenticado")
+            firestore.collection("users").document(uid).update("role", newRole.name).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

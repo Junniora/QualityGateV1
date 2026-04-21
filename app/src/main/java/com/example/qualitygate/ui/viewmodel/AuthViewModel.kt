@@ -28,8 +28,7 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
         viewModelScope.launch {
             val uid = repository.getCurrentUserUid()
             if (uid != null) {
-                val result = repository.getUserRole(uid) // This is just a role check, ideally we'd fetch full user
-                // For simplicity in this demo, we rely on the login to set the currentUser
+                // In a real app, we'd fetch the full user object from Firestore here
             }
         }
     }
@@ -54,7 +53,6 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
         viewModelScope.launch {
             val result = repository.register(cleanEmail, cleanPass, name, role)
             if (result.isSuccess) {
-                // After registration, we don't auto-login because of email verification
                 _authState.value = Result.success(User(name = name, email = email, role = role))
             } else {
                 _authState.value = Result.failure(result.exceptionOrNull() ?: Exception("Registration failed"))
@@ -68,6 +66,16 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
             _updateState.value = result
             if (result.isSuccess) {
                 _currentUser.value = _currentUser.value?.copy(name = newName)
+            }
+        }
+    }
+
+    fun updateRole(newRole: UserRole) {
+        viewModelScope.launch {
+            val result = repository.updateRole(newRole)
+            _updateState.value = result
+            if (result.isSuccess) {
+                _currentUser.value = _currentUser.value?.copy(role = newRole)
             }
         }
     }

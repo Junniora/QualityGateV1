@@ -42,8 +42,15 @@ fun RegisterProductScreen(
     onBack: () -> Unit
 ) {
     var partNumber by remember { mutableStateOf("") }
+    var serialNumber by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var provider by remember { mutableStateOf("Toyota") }
     var classification by remember { mutableStateOf(ProductClassification.NUEVO_PRODUCTO) }
-    var expanded by remember { mutableStateOf(false) }
+    
+    var expandedProvider by remember { mutableStateOf(false) }
+    var expandedClass by remember { mutableStateOf(false) }
+    
+    val providers = listOf("Toyota", "Subaru", "Ford", "Mazda", "Stellantis")
     val selectedPhotos = remember { mutableStateListOf<Uri>() }
     var isUploading by remember { mutableStateOf(false) }
 
@@ -62,6 +69,7 @@ fun RegisterProductScreen(
     val registrationState by productViewModel.registrationState.collectAsState()
 
     val supervisorName = currentUser?.name ?: "Cargando..."
+    val supervisorId = currentUser?.id ?: ""
 
     LaunchedEffect(registrationState) {
         registrationState?.getOrNull()?.let { productId ->
@@ -108,29 +116,77 @@ fun RegisterProductScreen(
                         shape = RoundedCornerShape(12.dp)
                     )
 
+                    OutlinedTextField(
+                        value = serialNumber,
+                        onValueChange = { serialNumber = it },
+                        label = { Text("Número de Serie") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Descripción") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        minLines = 2
+                    )
+
+                    // Dropdown para Proveedor
                     ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = !expanded }
+                        expanded = expandedProvider,
+                        onExpandedChange = { expandedProvider = !expandedProvider }
+                    ) {
+                        OutlinedTextField(
+                            value = provider,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Proveedor") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedProvider) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedProvider,
+                            onDismissRequest = { expandedProvider = false }
+                        ) {
+                            providers.forEach { p ->
+                                DropdownMenuItem(
+                                    text = { Text(p) },
+                                    onClick = {
+                                        provider = p
+                                        expandedProvider = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Dropdown para Clasificación
+                    ExposedDropdownMenuBox(
+                        expanded = expandedClass,
+                        onExpandedChange = { expandedClass = !expandedClass }
                     ) {
                         OutlinedTextField(
                             value = classification.name.replace("_", " "),
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Clasificación") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedClass) },
                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
                         ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
+                            expanded = expandedClass,
+                            onDismissRequest = { expandedClass = false }
                         ) {
                             ProductClassification.entries.forEach { entry ->
                                 DropdownMenuItem(
                                     text = { Text(entry.name.replace("_", " ")) },
                                     onClick = {
                                         classification = entry
-                                        expanded = false
+                                        expandedClass = false
                                     }
                                 )
                             }
@@ -139,7 +195,7 @@ fun RegisterProductScreen(
                 }
             }
 
-            Text("Fotografías (Requerido: 4)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            Text("Fotografías (Opcional)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
             
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -161,25 +217,23 @@ fun RegisterProductScreen(
                         }
                     }
                 }
-                if (selectedPhotos.size < 4) {
-                    item {
-                        Surface(
-                            modifier = Modifier.size(120.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            onClick = {
-                                val file = File(context.cacheDir, "temp_photo_${System.currentTimeMillis()}.jpg")
-                                tempPhotoUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                                cameraLauncher.launch(tempPhotoUri!!)
-                            }
+                item {
+                    Surface(
+                        modifier = Modifier.size(120.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        onClick = {
+                            val file = File(context.cacheDir, "temp_photo_${System.currentTimeMillis()}.jpg")
+                            tempPhotoUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            cameraLauncher.launch(tempPhotoUri!!)
+                        }
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(Icons.Default.AddAPhoto, contentDescription = null)
-                                Text("Tomar Foto", style = MaterialTheme.typography.labelSmall)
-                            }
+                            Icon(Icons.Default.AddAPhoto, contentDescription = null)
+                            Text("Tomar Foto", style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
@@ -193,13 +247,15 @@ fun RegisterProductScreen(
                 Button(
                     onClick = { 
                         isUploading = true
-                        productViewModel.registerProduct(classification, partNumber, supervisorName, selectedPhotos) 
+                        productViewModel.registerProduct(
+                            classification, partNumber, serialNumber, description, provider, supervisorName, supervisorId, selectedPhotos
+                        ) 
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = partNumber.isNotBlank() && selectedPhotos.size == 4 && !isUploading
+                    enabled = partNumber.isNotBlank() && serialNumber.isNotBlank() && description.isNotBlank() && !isUploading
                 ) {
                     Text("Registrar e Iniciar Planeación", fontWeight = FontWeight.SemiBold)
                 }

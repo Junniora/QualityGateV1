@@ -69,14 +69,22 @@ class ProductViewModel(private val repository: ProductRepository = ProductReposi
     fun registerProduct(
         classification: ProductClassification,
         partNumber: String,
+        serialNumber: String,
+        description: String,
+        provider: String,
         supervisorName: String,
+        supervisorId: String,
         photoUris: List<Uri>
     ) {
         viewModelScope.launch {
             val product = Product(
                 classification = classification,
                 partNumber = partNumber,
+                serialNumber = serialNumber,
+                description = description,
+                provider = provider,
                 supervisorName = supervisorName,
+                supervisorId = supervisorId,
                 status = ProductStatus.PLANNING,
                 registrationDate = Timestamp.now()
             )
@@ -85,6 +93,22 @@ class ProductViewModel(private val repository: ProductRepository = ProductReposi
             if (result.isSuccess) {
                 fetchProducts()
             }
+        }
+    }
+
+    fun updateProduct(product: Product, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.updateProduct(product)
+            if (result.isSuccess) fetchProducts()
+            onComplete(result.isSuccess)
+        }
+    }
+
+    fun deleteProduct(productId: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.deleteProduct(productId)
+            if (result.isSuccess) fetchProducts()
+            onComplete(result.isSuccess)
         }
     }
 

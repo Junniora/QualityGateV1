@@ -1,48 +1,44 @@
-# QualityGate (QA PMS)
+# QualityGate (QA PMS) - v2.0
 
-**QualityGate** es un Sistema de Gestión de Calidad (Product Management System) diseñado específicamente para el seguimiento y validación de productos en entornos industriales, como la fabricación de clusters automotrices.
+**QualityGate** es un Sistema de Gestión de Calidad (Product Management System) de alto rendimiento, diseñado específicamente para la trazabilidad y validación de componentes en la industria automotriz.
 
-La aplicación digitaliza el proceso de aseguramiento de calidad, permitiendo una trazabilidad completa desde el registro inicial de un producto hasta su aprobación final para producción masiva.
+Esta versión 2.0 digitaliza el ecosistema de aseguramiento de calidad, permitiendo un control granular desde el registro del hardware hasta la liberación para producción masiva mediante un flujo de trabajo optimizado y dashboards analíticos.
 
 ## 🚀 Propósito del Proyecto
-El objetivo principal es eliminar el seguimiento manual y disperso de las actividades de validación (milestones). QualityGate asegura que cada etapa del proceso de calidad se cumpla bajo los estándares requeridos, permitiendo la colaboración en tiempo real entre supervisores, revisores y aprobadores.
+El objetivo es estandarizar el proceso de validación (milestones), eliminando la dependencia de hojas de cálculo y papel. QualityGate asegura que cada hito técnico sea registrado, verificado y aprobado digitalmente, garantizando una trazabilidad inmutable de cada unidad.
 
-## 👥 Roles y Flujo de Trabajo
-La aplicación utiliza un sistema de control de acceso basado en roles (RBAC) gestionado a través de Firebase:
+## 👥 Roles y Ecosistema de Trabajo
+La aplicación implementa un sistema de navegación dinámica basado en el rol del usuario autenticado:
 
-1.  **Supervisor (Producción/Calidad):**
-    *   Registra nuevos productos con evidencias fotográficas (4 ángulos obligatorios).
-    *   Realiza la planeación de fechas (Milestones).
-    *   Registra las fechas reales de ejecución durante la etapa "On Going".
+1.  **Supervisor (Producción):**
+    *   **Registro Técnico:** Captura de P/N, S/N, Descripción y Proveedor.
+    *   **Evidencia Flexible:** Registro rápido con fotos opcionales.
+    *   **Mis Proyectos:** Panel exclusivo para editar o eliminar registros propios en tiempo real.
 2.  **Revisor (Ingeniería de Calidad):**
-    *   Realiza la "Pre-Revisión" de la planeación.
-    *   Ejecuta la "Revisión Final" técnica una vez completadas las actividades.
-    *   Provee feedback constructivo en caso de rechazo.
-3.  **Aprobador (Gerencia de Planta/Calidad):**
-    *   Otorga la validación final para el cierre del proyecto y liberación de producción.
+    *   **Validación de Planeación:** Aprueba el cronograma de actividades inicial.
+    *   **Auditoría de Hitos:** Verifica el cumplimiento de los 45 puntos de control.
+3.  **Aprobador (Gerencia / KPI User):**
+    *   **Validación Final:** Autoridad para el cierre definitivo del proyecto.
+    *   **KPI Dashboard:** Acceso a métricas analíticas y gráficas de rendimiento operativo.
 
-## 🛠️ Funcionalidades Principales
-*   **Gestión de Milestones Automática:** Generación inteligente de 45 actividades para "Nuevos Productos" y 38 para "Transferencias".
-*   **Evidencia Fotográfica:** Integración con la cámara del dispositivo y almacenamiento en la nube (Firebase Storage).
-*   **Ciclo de Vida del Producto:** Estados dinámicos: *Planning ➔ Pre-Revision ➔ On Going ➔ Final Revision ➔ Aprobación Final ➔ Completed*.
-*   **Sistema de Feedback:** Registro histórico de comentarios y motivos de rechazo para mejora continua.
-*   **Dashboard Inteligente:** Interfaz personalizada según el rol del usuario logueado.
+## 🛠️ Funcionalidades Destacadas (v2.0)
+*   **KPI Analytics Dashboard:** Visualización de datos mediante gráficos de pastel (distribución de fases) y barras (líderes de registro) para la toma de decisiones gerenciales.
+*   **Gestión de "Mis Proyectos":** Herramientas de edición y limpieza en cascada exclusivas para el creador del registro.
+*   **Subida Paralela de Datos:** Algoritmos de concurrencia para la carga de evidencias fotográficas, reduciendo tiempos de espera en un 70%.
+*   **Navegación Adaptativa:** Interfaz que se reconfigura automáticamente según el perfil de seguridad del usuario.
+*   **Demo Data Generator:** Sistema integrado de inyección de datos para pruebas rápidas de trazabilidad (Toyota, Ford, etc.).
+
+## 📋 Especificaciones de Trazabilidad
+El sistema ahora gestiona campos obligatorios críticos para el sector industrial:
+*   **ID de Proveedor:** Toyota, Subaru, Ford, Mazda, Stellantis.
+*   **Hardware ID:** Número de Serie (S/N) único por pieza.
+*   **Control de Versión:** Número de Parte (P/N).
 
 ## 🏗️ Arquitectura Técnica
-*   **Lenguaje:** Kotlin
-*   **UI:** Jetpack Compose (Diseño Moderno y Reactivo)
-*   **Arquitectura:** MVVM (Model-View-ViewModel)
-*   **Backend:** Firebase
-    *   *Authentication:* Registro e inicio de sesión seguro.
-    *   *Firestore:* Base de datos NoSQL en tiempo real para productos y hitos.
-    *   *Storage:* Almacenamiento de imágenes de alta resolución.
-*   **Navegación:** Jetpack Navigation Component.
-
-## 📸 Capturas de Pantalla (Estructura de UI)
-1.  **Login:** Acceso seguro con validación de correo.
-2.  **Dashboard (QualityGate):** Acceso rápido a las tareas críticas del rol.
-3.  **Registro:** Formulario validado con captura de 4 fotos.
-4.  **Detalle de Producto:** Vista interactiva de hitos y cronograma.
+*   **UI Engine:** Jetpack Compose (Apple/iOS Design Language).
+*   **Lógica de Negocio:** MVVM con StateFlow.
+*   **Infraestructura:** Firebase (Auth, Firestore, Cloud Storage).
+*   **Optimización:** Coroutines de Kotlin para procesos de red asíncronos.
 
 ---
-*Desarrollado para la optimización de procesos de calidad industrial.*
+*QualityGate v2.0 - Optimizando la excelencia operativa en la manufactura automotriz.*
