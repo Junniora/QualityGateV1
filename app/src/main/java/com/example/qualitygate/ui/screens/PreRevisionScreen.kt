@@ -27,7 +27,7 @@ fun PreRevisionScreen(
     onProductClick: (Product) -> Unit
 ) {
     val products by productViewModel.productList.collectAsState()
-    val preRevisionProducts = products.filter { it.status == ProductStatus.PLANNING }
+    val preRevisionProducts = products.filter { it.status == ProductStatus.PRE_REVISION }
 
     Scaffold(
         topBar = {
