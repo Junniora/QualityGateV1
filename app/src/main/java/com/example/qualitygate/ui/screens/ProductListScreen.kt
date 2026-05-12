@@ -19,12 +19,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.qualitygate.data.model.Product
-import com.example.qualitygate.data.model.ProductClassification
-import com.example.qualitygate.data.model.ProductStatus
-import com.example.qualitygate.data.model.UserRole
+import com.example.qualitygate.data.model.*
+import com.example.qualitygate.data.util.MilestoneTemplates
 import com.example.qualitygate.ui.viewmodel.AuthViewModel
 import com.example.qualitygate.ui.viewmodel.ProductViewModel
+import com.google.firebase.Timestamp
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,25 +54,7 @@ fun ProductListScreen(
                         if (currentUser?.role == UserRole.SUPERVISOR) {
                             IconButton(onClick = {
                                 isGeneratingDemo = true
-                                val demoData = listOf(
-                                    Triple("TOY-ALT-2GR-045", "TY20260420-000874", "Alternador para motor 2GR, 12V" to "Toyota"),
-                                    Triple("SUB-INJ-BOX-778", "SB20260420-5562", "Inyector para motor bóxer 2.0L" to "Subaru"),
-                                    Triple("FRD-BRK-ABS-321", "FD20260420-7781", "Módulo ABS sistema de frenos" to "Ford"),
-                                    Triple("MAZ-SNS-SKY-112", "MZ9834521", "Sensor de temperatura motor Skyactiv" to "Mazda"),
-                                    Triple("STL-TRN-AUTO-991", "STL00456789", "Componente de transmisión automática" to "Stellantis")
-                                )
-                                demoData.forEach { (pn, sn, extra) ->
-                                    productViewModel.registerProduct(
-                                        classification = ProductClassification.NUEVO_PRODUCTO,
-                                        partNumber = pn,
-                                        serialNumber = sn,
-                                        description = extra.first,
-                                        provider = extra.second,
-                                        supervisorName = currentUser?.name ?: "Demo User",
-                                        supervisorId = currentUser?.id ?: "demo_id",
-                                        photoUris = emptyList()
-                                    )
-                                }
+                                generateDemoScenarios(productViewModel, currentUser)
                                 isGeneratingDemo = false
                             }) {
                                 if (isGeneratingDemo) CircularProgressIndicator(modifier = Modifier.size(24.dp))
@@ -84,7 +66,7 @@ fun ProductListScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar por P/N o Responsable") },
+                    placeholder = { Text("Buscar P/N, Marca o Responsable") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -92,8 +74,8 @@ fun ProductListScreen(
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = Color.Transparent,
                         unfocusedContainerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
                         focusedContainerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                     ),
@@ -122,7 +104,7 @@ fun ProductListScreen(
 
         if (filteredProducts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No hay resultados", color = MaterialTheme.colorScheme.secondary)
+                Text("Sin productos registrados", color = MaterialTheme.colorScheme.secondary)
             }
         } else {
             LazyColumn(
@@ -136,6 +118,108 @@ fun ProductListScreen(
             }
         }
     }
+}
+
+fun generateDemoScenarios(viewModel: ProductViewModel, currentUser: User?) {
+    val supervisorName = currentUser?.name ?: "Demo User"
+    val supervisorId = currentUser?.id ?: "demo_id"
+    val templates = MilestoneTemplates.NEW_PRODUCT_MILESTONES
+
+    fun getFutureDate(days: Int): Timestamp {
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_YEAR, days)
+        return Timestamp(cal.time)
+    }
+
+    fun getPastDate(days: Int): Timestamp {
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_YEAR, -days)
+        return Timestamp(cal.time)
+    }
+
+    // 1. Toyota - PLANNING
+    val toyota = Product(
+        classification = ProductClassification.NUEVO_PRODUCTO,
+        partNumber = "TOY-ALT-2GR-045",
+        serialNumber = "TY2026-874",
+        description = "Alternador 12V",
+        provider = "Toyota",
+        supervisorName = supervisorName,
+        supervisorId = supervisorId,
+        status = ProductStatus.PLANNING
+    )
+    val toyotaHitos = templates.mapIndexed { i, name ->
+        Milestone(name = name, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i + 2), status = MilestoneStatus.PENDIENTE)
+    }
+    viewModel.registerFullProduct(toyota, toyotaHitos) {}
+
+    // 2. Ford - PRE_REVISION
+    val ford = Product(
+        classification = ProductClassification.NUEVO_PRODUCTO,
+        partNumber = "FRD-BRK-ABS-321",
+        serialNumber = "FD2026-7781",
+        description = "Módulo ABS",
+        provider = "Ford",
+        supervisorName = supervisorName,
+        supervisorId = supervisorId,
+        status = ProductStatus.PRE_REVISION
+    )
+    val fordHitos = templates.mapIndexed { i, name ->
+        Milestone(name = name, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i + 1), status = MilestoneStatus.PENDIENTE)
+    }
+    viewModel.registerFullProduct(ford, fordHitos) {}
+
+    // 3. Mazda - ON_GOING (DELAY)
+    val mazda = Product(
+        classification = ProductClassification.NUEVO_PRODUCTO,
+        partNumber = "MAZ-SNS-SKY-112",
+        serialNumber = "MZ9834521",
+        description = "Sensor Skyactiv",
+        provider = "Mazda",
+        supervisorName = supervisorName,
+        supervisorId = supervisorId,
+        status = ProductStatus.ON_GOING
+    )
+    val mazdaHitos = templates.mapIndexed { i, name ->
+        Milestone(name = name, order = i, plannedStart = getPastDate(10), plannedEnd = getPastDate(5), status = MilestoneStatus.PENDIENTE)
+    }
+    viewModel.registerFullProduct(mazda, mazdaHitos) {}
+
+    // 4. Subaru - ON_GOING (Progreso 50%)
+    val subaru = Product(
+        classification = ProductClassification.NUEVO_PRODUCTO,
+        partNumber = "SUB-INJ-BOX-778",
+        serialNumber = "SB2026-5562",
+        description = "Inyector 2.0L",
+        provider = "Subaru",
+        supervisorName = supervisorName,
+        supervisorId = supervisorId,
+        status = ProductStatus.ON_GOING
+    )
+    val subaruHitos = templates.mapIndexed { i, name ->
+        if (i < templates.size / 2) {
+            Milestone(name = name, order = i, plannedStart = getPastDate(20), plannedEnd = getPastDate(10), realStart = getPastDate(15), realEnd = getPastDate(11), status = MilestoneStatus.COMPLETADO)
+        } else {
+            Milestone(name = name, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i + 5), status = MilestoneStatus.PENDIENTE)
+        }
+    }
+    viewModel.registerFullProduct(subaru, subaruHitos) {}
+
+    // 5. Stellantis - APROBACION_FINAL
+    val stellan = Product(
+        classification = ProductClassification.NUEVO_PRODUCTO,
+        partNumber = "STL-TRN-AUTO-991",
+        serialNumber = "STL00456",
+        description = "Transmisión Auto",
+        provider = "Stellantis",
+        supervisorName = supervisorName,
+        supervisorId = supervisorId,
+        status = ProductStatus.APROBACION_FINAL
+    )
+    val stellanHitos = templates.mapIndexed { i, name ->
+        Milestone(name = name, order = i, plannedStart = getPastDate(30), plannedEnd = getPastDate(20), realStart = getPastDate(25), realEnd = getPastDate(21), status = MilestoneStatus.COMPLETADO)
+    }
+    viewModel.registerFullProduct(stellan, stellanHitos) {}
 }
 
 @Composable
@@ -173,16 +257,16 @@ fun AppleProductItem(product: Product, onClick: () -> Unit) {
             
             Surface(
                 color = when(product.status) {
-                    ProductStatus.PLANNING -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                    ProductStatus.ON_GOING -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
+                    ProductStatus.PLANNING -> Color.Gray.copy(alpha = 0.1f)
+                    ProductStatus.ON_GOING -> Color(0xFF007AFF).copy(alpha = 0.1f)
                     ProductStatus.COMPLETED -> Color(0xFF34C759).copy(alpha = 0.1f)
-                    else -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                    else -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
                 },
                 contentColor = when(product.status) {
-                    ProductStatus.PLANNING -> MaterialTheme.colorScheme.secondary
-                    ProductStatus.ON_GOING -> MaterialTheme.colorScheme.tertiary
+                    ProductStatus.PLANNING -> Color.Gray
+                    ProductStatus.ON_GOING -> Color(0xFF007AFF)
                     ProductStatus.COMPLETED -> Color(0xFF34C759)
-                    else -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.tertiary
                 },
                 shape = RoundedCornerShape(8.dp)
             ) {
