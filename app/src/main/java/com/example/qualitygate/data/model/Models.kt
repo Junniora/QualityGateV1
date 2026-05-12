@@ -56,6 +56,8 @@ data class Feedback(
     val id: String = "",
     val productId: String = "",
     val userId: String = "",
+    val userName: String = "",
+    val userRole: String = "",
     val comment: String = "",
     val date: Timestamp = Timestamp.now()
 )

@@ -176,6 +176,7 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
             composable("pre_revision") {
                 PreRevisionScreen(
                     productViewModel = productViewModel,
+                    authViewModel = authViewModel, // Added authViewModel
                     onProductClick = { product -> 
                         navController.navigate("product_detail/${product.id}")
                     }
@@ -184,6 +185,7 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
             composable("approvals") {
                 ApprovalsScreen(
                     productViewModel = productViewModel,
+                    authViewModel = authViewModel, // Added authViewModel
                     onProductClick = { product -> 
                         navController.navigate("product_detail/${product.id}")
                     }
@@ -200,7 +202,7 @@ fun AppNavigation(authViewModel: AuthViewModel, productViewModel: ProductViewMod
                 ProductDetailScreen(
                     productId = productId,
                     productViewModel = productViewModel,
-                    userRole = currentUser?.role ?: UserRole.SUPERVISOR,
+                    authViewModel = authViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }

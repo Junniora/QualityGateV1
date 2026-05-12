@@ -56,9 +56,16 @@ class ProductViewModel(private val repository: ProductRepository = ProductReposi
         }
     }
 
-    fun addFeedback(productId: String, userId: String, comment: String) {
+    fun addFeedback(productId: String, userId: String, userName: String, userRole: String, comment: String) {
         viewModelScope.launch {
-            val feedback = Feedback(productId = productId, userId = userId, comment = comment, date = Timestamp.now())
+            val feedback = Feedback(
+                productId = productId, 
+                userId = userId, 
+                userName = userName,
+                userRole = userRole,
+                comment = comment, 
+                date = Timestamp.now()
+            )
             val result = repository.addFeedback(feedback)
             if (result.isSuccess) {
                 fetchFeedback(productId)

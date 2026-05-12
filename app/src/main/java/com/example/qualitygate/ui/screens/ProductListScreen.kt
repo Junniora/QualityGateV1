@@ -1,15 +1,16 @@
 package com.example.qualitygate.ui.screens
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,85 +37,100 @@ fun ProductListScreen(
 ) {
     val products by productViewModel.productList.collectAsState()
     val currentUser by authViewModel.currentUser.collectAsState()
+    
     var searchQuery by remember { mutableStateOf("") }
+    var selectedProvider by remember { mutableStateOf<String?>(null) }
+    var selectedClass by remember { mutableStateOf<ProductClassification?>(null) }
+    var selectedStatus by remember { mutableStateOf<ProductStatus?>(null) }
+    var showFilters by remember { mutableStateOf(false) }
     var isGeneratingDemo by remember { mutableStateOf(false) }
+
+    val providers = listOf("Toyota", "Subaru", "Ford", "Mazda", "Stellantis")
+
+    val filteredProducts = products.filter { product ->
+        val matchesSearch = product.partNumber.contains(searchQuery, true) || 
+                          product.supervisorName.contains(searchQuery, true) ||
+                          product.serialNumber.contains(searchQuery, true)
+        val matchesProvider = selectedProvider == null || product.provider == selectedProvider
+        val matchesClass = selectedClass == null || product.classification == selectedClass
+        val matchesStatus = selectedStatus == null || product.status == selectedStatus
+        
+        matchesSearch && matchesProvider && matchesClass && matchesStatus
+    }
 
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
-                CenterAlignedTopAppBar(
-                    title = { 
-                        Text(
-                            "Explorar Productos", 
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
-                        ) 
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
-                    actions = {
-                        if (currentUser?.role == UserRole.SUPERVISOR) {
-                            IconButton(onClick = {
-                                isGeneratingDemo = true
-                                generateDemoScenarios(productViewModel, currentUser)
-                                isGeneratingDemo = false
-                            }) {
-                                if (isGeneratingDemo) CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                                else Icon(Icons.Default.AutoAwesome, contentDescription = "Demo Data", tint = MaterialTheme.colorScheme.primary)
+            Surface(color = MaterialTheme.colorScheme.background) {
+                Column {
+                    CenterAlignedTopAppBar(
+                        title = { Text("Explorar Productos", fontWeight = FontWeight.Bold) },
+                        actions = {
+                            IconButton(onClick = { showFilters = !showFilters }) {
+                                Icon(Icons.Default.FilterList, null, tint = if(showFilters) MaterialTheme.colorScheme.primary else Color.Gray)
+                            }
+                            if (currentUser?.role == UserRole.SUPERVISOR) {
+                                IconButton(onClick = {
+                                    isGeneratingDemo = true
+                                    generateDemoScenarios(productViewModel, currentUser)
+                                    isGeneratingDemo = false
+                                }) {
+                                    if (isGeneratingDemo) CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    else Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    )
+                    
+                    // Buscador Arreglado (Full Width)
+                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Buscar P/N, S/N o Responsable") },
+                            leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedBorderColor = Color.Transparent
+                            )
+                        )
+                    }
+
+                    AnimatedVisibility(visible = showFilters) {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Marca:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(providers) { p ->
+                                    FilterChip(selected = selectedProvider == p, onClick = { selectedProvider = if(selectedProvider == p) null else p }, label = { Text(p) })
+                                }
+                            }
+                            Text("Estado:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(ProductStatus.entries.toList()) { s ->
+                                    FilterChip(selected = selectedStatus == s, onClick = { selectedStatus = if(selectedStatus == s) null else s }, label = { Text(s.name) })
+                                }
+                            }
+                            TextButton(onClick = { selectedProvider = null; selectedStatus = null; searchQuery = "" }, modifier = Modifier.align(Alignment.End)) {
+                                Text("Limpiar Filtros", color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
-                )
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar P/N, Marca o Responsable") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                        focusedContainerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                    ),
-                    singleLine = true
-                )
+                }
             }
         },
         floatingActionButton = {
             if (currentUser?.role == UserRole.SUPERVISOR) {
-                FloatingActionButton(
-                    onClick = onAddProductClick,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar Producto")
-                }
+                FloatingActionButton(onClick = onAddProductClick) { Icon(Icons.Default.Add, null) }
             }
         }
     ) { padding ->
-        val filteredProducts = products.filter { 
-            it.partNumber.contains(searchQuery, ignoreCase = true) || 
-            it.supervisorName.contains(searchQuery, ignoreCase = true) ||
-            it.provider.contains(searchQuery, ignoreCase = true)
-        }
-
-        if (filteredProducts.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Sin productos registrados", color = MaterialTheme.colorScheme.secondary)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding),
-                contentPadding = PaddingValues(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filteredProducts) { product ->
-                    AppleProductItem(product = product, onClick = { onProductClick(product) })
-                }
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(filteredProducts) { product ->
+                AppleProductItem(product = product, onClick = { onProductClick(product) })
             }
         }
     }
@@ -124,157 +140,27 @@ fun generateDemoScenarios(viewModel: ProductViewModel, currentUser: User?) {
     val supervisorName = currentUser?.name ?: "Demo User"
     val supervisorId = currentUser?.id ?: "demo_id"
     val templates = MilestoneTemplates.NEW_PRODUCT_MILESTONES
+    fun getFutureDate(d: Int) = Timestamp(Date(System.currentTimeMillis() + d * 86400000L))
+    fun getPastDate(d: Int) = Timestamp(Date(System.currentTimeMillis() - d * 86400000L))
 
-    fun getFutureDate(days: Int): Timestamp {
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, days)
-        return Timestamp(cal.time)
-    }
+    val toyota = Product(classification = ProductClassification.NUEVO_PRODUCTO, partNumber = "TOY-ALT-045", serialNumber = "TY-874", description = "Alternador 12V", provider = "Toyota", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.PLANNING)
+    viewModel.registerFullProduct(toyota, templates.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i+2)) }) {}
 
-    fun getPastDate(days: Int): Timestamp {
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -days)
-        return Timestamp(cal.time)
-    }
-
-    // 1. Toyota - PLANNING
-    val toyota = Product(
-        classification = ProductClassification.NUEVO_PRODUCTO,
-        partNumber = "TOY-ALT-2GR-045",
-        serialNumber = "TY2026-874",
-        description = "Alternador 12V",
-        provider = "Toyota",
-        supervisorName = supervisorName,
-        supervisorId = supervisorId,
-        status = ProductStatus.PLANNING
-    )
-    val toyotaHitos = templates.mapIndexed { i, name ->
-        Milestone(name = name, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i + 2), status = MilestoneStatus.PENDIENTE)
-    }
-    viewModel.registerFullProduct(toyota, toyotaHitos) {}
-
-    // 2. Ford - PRE_REVISION
-    val ford = Product(
-        classification = ProductClassification.NUEVO_PRODUCTO,
-        partNumber = "FRD-BRK-ABS-321",
-        serialNumber = "FD2026-7781",
-        description = "Módulo ABS",
-        provider = "Ford",
-        supervisorName = supervisorName,
-        supervisorId = supervisorId,
-        status = ProductStatus.PRE_REVISION
-    )
-    val fordHitos = templates.mapIndexed { i, name ->
-        Milestone(name = name, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i + 1), status = MilestoneStatus.PENDIENTE)
-    }
-    viewModel.registerFullProduct(ford, fordHitos) {}
-
-    // 3. Mazda - ON_GOING (DELAY)
-    val mazda = Product(
-        classification = ProductClassification.NUEVO_PRODUCTO,
-        partNumber = "MAZ-SNS-SKY-112",
-        serialNumber = "MZ9834521",
-        description = "Sensor Skyactiv",
-        provider = "Mazda",
-        supervisorName = supervisorName,
-        supervisorId = supervisorId,
-        status = ProductStatus.ON_GOING
-    )
-    val mazdaHitos = templates.mapIndexed { i, name ->
-        Milestone(name = name, order = i, plannedStart = getPastDate(10), plannedEnd = getPastDate(5), status = MilestoneStatus.PENDIENTE)
-    }
-    viewModel.registerFullProduct(mazda, mazdaHitos) {}
-
-    // 4. Subaru - ON_GOING (Progreso 50%)
-    val subaru = Product(
-        classification = ProductClassification.NUEVO_PRODUCTO,
-        partNumber = "SUB-INJ-BOX-778",
-        serialNumber = "SB2026-5562",
-        description = "Inyector 2.0L",
-        provider = "Subaru",
-        supervisorName = supervisorName,
-        supervisorId = supervisorId,
-        status = ProductStatus.ON_GOING
-    )
-    val subaruHitos = templates.mapIndexed { i, name ->
-        if (i < templates.size / 2) {
-            Milestone(name = name, order = i, plannedStart = getPastDate(20), plannedEnd = getPastDate(10), realStart = getPastDate(15), realEnd = getPastDate(11), status = MilestoneStatus.COMPLETADO)
-        } else {
-            Milestone(name = name, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i + 5), status = MilestoneStatus.PENDIENTE)
-        }
-    }
-    viewModel.registerFullProduct(subaru, subaruHitos) {}
-
-    // 5. Stellantis - APROBACION_FINAL
-    val stellan = Product(
-        classification = ProductClassification.NUEVO_PRODUCTO,
-        partNumber = "STL-TRN-AUTO-991",
-        serialNumber = "STL00456",
-        description = "Transmisión Auto",
-        provider = "Stellantis",
-        supervisorName = supervisorName,
-        supervisorId = supervisorId,
-        status = ProductStatus.APROBACION_FINAL
-    )
-    val stellanHitos = templates.mapIndexed { i, name ->
-        Milestone(name = name, order = i, plannedStart = getPastDate(30), plannedEnd = getPastDate(20), realStart = getPastDate(25), realEnd = getPastDate(21), status = MilestoneStatus.COMPLETADO)
-    }
-    viewModel.registerFullProduct(stellan, stellanHitos) {}
+    val vw = Product(classification = ProductClassification.NUEVO_PRODUCTO, partNumber = "VW-GOLF-DASH", serialNumber = "VW-222", description = "Cluster Digital", provider = "Toyota", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.COMPLETED)
+    viewModel.registerFullProduct(vw, templates.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getPastDate(10), plannedEnd = getPastDate(5), realStart = getPastDate(9), realEnd = getPastDate(4), status = MilestoneStatus.COMPLETADO) }) {}
 }
 
 @Composable
 fun AppleProductItem(product: Product, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    Card(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { onClick() }) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = product.partNumber, 
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                )
-                Text(
-                    text = "${product.provider} | ${product.classification.name.replace("_", " ")}", 
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = product.description,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    maxLines = 1
-                )
+                Text(product.partNumber, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("${product.provider} | ${product.classification.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Text("Responsable: ${product.supervisorName}", style = MaterialTheme.typography.labelSmall)
             }
-            
-            Surface(
-                color = when(product.status) {
-                    ProductStatus.PLANNING -> Color.Gray.copy(alpha = 0.1f)
-                    ProductStatus.ON_GOING -> Color(0xFF007AFF).copy(alpha = 0.1f)
-                    ProductStatus.COMPLETED -> Color(0xFF34C759).copy(alpha = 0.1f)
-                    else -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
-                },
-                contentColor = when(product.status) {
-                    ProductStatus.PLANNING -> Color.Gray
-                    ProductStatus.ON_GOING -> Color(0xFF007AFF)
-                    ProductStatus.COMPLETED -> Color(0xFF34C759)
-                    else -> MaterialTheme.colorScheme.tertiary
-                },
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = product.status.name,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                )
+            Surface(color = if(product.status == ProductStatus.COMPLETED) Color(0xFF34C759).copy(0.1f) else Color.Gray.copy(0.1f), shape = RoundedCornerShape(8.dp)) {
+                Text(product.status.name, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
     }

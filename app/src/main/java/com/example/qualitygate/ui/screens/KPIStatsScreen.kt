@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -52,18 +53,18 @@ fun KPIStatsScreen(productViewModel: ProductViewModel) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Text("Total de Proyectos", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
+                    Text("Total de Proyectos en Planta", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
                     Text("${products.size}", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
 
             // Gráfica de Pastel (Distribución por Fase)
-            KPIChartCard(title = "Distribución por Fase", icon = Icons.Default.PieChart) {
+            KPIChartCard(title = "Estatus de Proyectos", icon = Icons.Default.PieChart) {
                 PhasePieChart(products)
             }
 
             // Gráfica de Barras (Registros por Usuario)
-            KPIChartCard(title = "Líderes de Registro", icon = Icons.Default.BarChart) {
+            KPIChartCard(title = "Productividad por Supervisor", icon = Icons.Default.BarChart) {
                 UserBarChart(products)
             }
         }
@@ -78,11 +79,11 @@ fun KPIChartCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageV
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(title, fontWeight = FontWeight.Bold)
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
             }
             Spacer(Modifier.height(24.dp))
             content()
@@ -94,43 +95,67 @@ fun KPIChartCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageV
 fun PhasePieChart(products: List<Product>) {
     if (products.isEmpty()) {
         Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-            Text("Sin datos", color = Color.Gray)
+            Text("No hay datos para graficar", color = Color.Gray)
         }
         return
     }
 
     val stats = products.groupBy { it.status }.mapValues { it.value.size }
-    val colors = listOf(Color(0xFF007AFF), Color(0xFF5856D6), Color(0xFF34C759), Color(0xFFFF9500), Color(0xFFFF3B30), Color(0xFFAF52DE))
+    
+    // Mapeo de colores específicos para estados industriales
+    val statusColors = mapOf(
+        ProductStatus.PLANNING to Color(0xFF9E9E9E),       // Gris
+        ProductStatus.PRE_REVISION to Color(0xFFFF9500),   // Naranja
+        ProductStatus.ON_GOING to Color(0xFF007AFF),       // Azul
+        ProductStatus.FINAL_REVISION to Color(0xFF5856D6), // Morado
+        ProductStatus.APROBACION_FINAL to Color(0xFFAF52DE),// Lavanda
+        ProductStatus.COMPLETED to Color(0xFF34C759),      // Verde (DONE)
+        ProductStatus.RECHAZADO to Color(0xFFFF3B30)       // Rojo
+    )
+
+    // Mapeo de nombres amigables para el usuario
+    val friendlyNames = mapOf(
+        ProductStatus.PLANNING to "Planeación",
+        ProductStatus.PRE_REVISION to "En Revisión Plan",
+        ProductStatus.ON_GOING to "En Ejecución",
+        ProductStatus.FINAL_REVISION to "Revisión Técnica",
+        ProductStatus.APROBACION_FINAL to "Validación Gerencia",
+        ProductStatus.COMPLETED to "DONE / FINALIZADO",
+        ProductStatus.RECHAZADO to "RECHAZADO"
+    )
     
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-        Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 var startAngle = -90f
                 val total = products.size.toFloat()
                 
-                stats.values.forEachIndexed { index, count ->
+                stats.forEach { (status, count) ->
                     val sweep = (count / total) * 360f
                     drawArc(
-                        color = colors.getOrElse(index) { Color.Gray },
+                        color = statusColors[status] ?: Color.Black,
                         startAngle = startAngle,
                         sweepAngle = sweep,
                         useCenter = false,
-                        style = Stroke(width = 25.dp.toPx(), cap = StrokeCap.Round)
+                        style = Stroke(width = 28.dp.toPx(), cap = StrokeCap.Round)
                     )
                     startAngle += sweep
                 }
             }
-            Text("${products.size}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("${products.size}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("Total", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            }
         }
         
         Spacer(Modifier.width(24.dp))
         
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            stats.keys.forEachIndexed { index, status ->
+            stats.keys.sortedBy { it.ordinal }.forEach { status ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(10.dp).background(colors.getOrElse(index) { Color.Gray }, CircleShape))
+                    Box(modifier = Modifier.size(12.dp).background(statusColors[status] ?: Color.Black, CircleShape))
                     Spacer(Modifier.width(8.dp))
-                    Text("${status.name}: ${stats[status]}", style = MaterialTheme.typography.labelSmall)
+                    Text("${friendlyNames[status] ?: status.name}: ${stats[status]}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -144,7 +169,7 @@ fun UserBarChart(products: List<Product>) {
 
     if (userStats.isEmpty()) {
         Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-            Text("Sin datos", color = Color.Gray)
+            Text("Sin registros de usuarios", color = Color.Gray)
         }
         return
     }
@@ -155,12 +180,12 @@ fun UserBarChart(products: List<Product>) {
             Column {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                    Text("$count", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("$count Proyectos", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                 }
                 Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = { count.toFloat() / max.toFloat() },
-                    modifier = Modifier.fillMaxWidth().height(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(10.dp).clip(CircleShape),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                     strokeCap = StrokeCap.Round
