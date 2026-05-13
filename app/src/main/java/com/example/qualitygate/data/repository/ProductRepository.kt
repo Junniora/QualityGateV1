@@ -30,10 +30,7 @@ class ProductRepository {
             val imageUrls = if (photoUris.isNotEmpty()) uploadPhotos(photoUris) else emptyList()
             val productRef = firestore.collection("products").document()
             val newId = productRef.id
-            val newProduct = product.copy(
-                id = newId,
-                photos = imageUrls
-            )
+            val newProduct = product.copy(id = newId, photos = imageUrls)
             
             val batch = firestore.batch()
             batch.set(productRef, newProduct)
@@ -154,8 +151,9 @@ class ProductRepository {
 
     suspend fun addFeedback(feedback: Feedback): Result<Unit> {
         return try {
-            val ref = firestore.collection("feedback").document()
-            firestore.collection("feedback").document(ref.id).set(feedback.copy(id = ref.id)).await()
+            val feedbackRef = firestore.collection("feedback").document()
+            val finalFeedback = feedback.copy(id = feedbackRef.id)
+            feedbackRef.set(finalFeedback).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -166,9 +164,12 @@ class ProductRepository {
         return try {
             val snapshot = firestore.collection("feedback")
                 .whereEqualTo("productId", productId)
-                .orderBy("date", Query.Direction.DESCENDING)
                 .get().await()
-            Result.success(snapshot.toObjects(Feedback::class.java))
+            
+            val feedbacks = snapshot.toObjects(Feedback::class.java)
+                .sortedByDescending { it.date }
+                
+            Result.success(feedbacks)
         } catch (e: Exception) {
             Result.failure(e)
         }
