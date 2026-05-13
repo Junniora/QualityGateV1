@@ -103,11 +103,15 @@ class ProductViewModel(private val repository: ProductRepository = ProductReposi
         }
     }
 
-    fun registerFullProduct(product: Product, milestones: List<Milestone>, onComplete: (Boolean) -> Unit) {
+    fun registerFullProduct(product: Product, milestones: List<Milestone>, onComplete: (String?) -> Unit) {
         viewModelScope.launch {
             val result = repository.registerFullProduct(product, milestones)
-            if (result.isSuccess) fetchProducts()
-            onComplete(result.isSuccess)
+            if (result.isSuccess) {
+                fetchProducts()
+                onComplete(result.getOrNull())
+            } else {
+                onComplete(null)
+            }
         }
     }
 

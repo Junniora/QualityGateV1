@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.qualitygate.data.model.User
 import com.example.qualitygate.data.model.UserRole
 import com.example.qualitygate.data.repository.AuthRepository
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class AuthViewModel(private val repository: AuthRepository = AuthRepository()) : ViewModel() {
 
@@ -28,7 +30,17 @@ class AuthViewModel(private val repository: AuthRepository = AuthRepository()) :
         viewModelScope.launch {
             val uid = repository.getCurrentUserUid()
             if (uid != null) {
-                // In a real app, we'd fetch the full user object from Firestore here
+                try {
+                    val doc = FirebaseFirestore.getInstance()
+                        .collection("users")
+                        .document(uid)
+                        .get()
+                        .await()
+                    val user = doc.toObject(User::class.java)
+                    _currentUser.value = user
+                } catch (e: Exception) {
+                    _currentUser.value = null
+                }
             }
         }
     }

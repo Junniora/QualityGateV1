@@ -45,7 +45,7 @@ fun ProductListScreen(
     var showFilters by remember { mutableStateOf(false) }
     var isGeneratingDemo by remember { mutableStateOf(false) }
 
-    val providers = listOf("Toyota", "Subaru", "Ford", "Mazda", "Stellantis")
+    val providers = listOf("Toyota", "Subaru", "Ford", "Mazda", "Stellantis", "Volkswagen")
 
     val filteredProducts = products.filter { product ->
         val matchesSearch = product.partNumber.contains(searchQuery, true) || 
@@ -81,7 +81,6 @@ fun ProductListScreen(
                         }
                     )
                     
-                    // Buscador Arreglado (Full Width)
                     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                         OutlinedTextField(
                             value = searchQuery,
@@ -111,7 +110,7 @@ fun ProductListScreen(
                             Text("Estado:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(ProductStatus.entries.toList()) { s ->
-                                    FilterChip(selected = selectedStatus == s, onClick = { selectedStatus = if(selectedStatus == s) null else s }, label = { Text(s.name) })
+                                    FilterChip(selected = selectedStatus == s, onClick = { selectedStatus = if(selectedStatus == s) null else s }, label = { Text(s.name.replace("_", " ")) })
                                 }
                             }
                             TextButton(onClick = { selectedProvider = null; selectedStatus = null; searchQuery = "" }, modifier = Modifier.align(Alignment.End)) {
@@ -139,15 +138,61 @@ fun ProductListScreen(
 fun generateDemoScenarios(viewModel: ProductViewModel, currentUser: User?) {
     val supervisorName = currentUser?.name ?: "Demo User"
     val supervisorId = currentUser?.id ?: "demo_id"
-    val templates = MilestoneTemplates.NEW_PRODUCT_MILESTONES
+    val templatesNew = MilestoneTemplates.NEW_PRODUCT_MILESTONES
+    val templatesTrans = MilestoneTemplates.TRANSFER_PRODUCT_MILESTONES
+
     fun getFutureDate(d: Int) = Timestamp(Date(System.currentTimeMillis() + d * 86400000L))
     fun getPastDate(d: Int) = Timestamp(Date(System.currentTimeMillis() - d * 86400000L))
 
+    // 1. Toyota - Planning
     val toyota = Product(classification = ProductClassification.NUEVO_PRODUCTO, partNumber = "TOY-ALT-045", serialNumber = "TY-874", description = "Alternador 12V", provider = "Toyota", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.PLANNING)
-    viewModel.registerFullProduct(toyota, templates.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i+2)) }) {}
+    viewModel.registerFullProduct(toyota, templatesNew.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getFutureDate(i), plannedEnd = getFutureDate(i+2)) }) { pid ->
+        if(pid != null) viewModel.addFeedback(pid, supervisorId, supervisorName, "SUPERVISOR", "Producto registrado en sistema. Pendiente de planeación de fechas.")
+    }
 
-    val vw = Product(classification = ProductClassification.NUEVO_PRODUCTO, partNumber = "VW-GOLF-DASH", serialNumber = "VW-222", description = "Cluster Digital", provider = "Toyota", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.COMPLETED)
-    viewModel.registerFullProduct(vw, templates.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getPastDate(10), plannedEnd = getPastDate(5), realStart = getPastDate(9), realEnd = getPastDate(4), status = MilestoneStatus.COMPLETADO) }) {}
+    // 2. Volkswagen - Completed
+    val vw = Product(classification = ProductClassification.NUEVO_PRODUCTO, partNumber = "VW-GOLF-DASH", serialNumber = "VW-222", description = "Cluster Digital", provider = "Volkswagen", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.COMPLETED)
+    viewModel.registerFullProduct(vw, templatesNew.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getPastDate(15), plannedEnd = getPastDate(10), realStart = getPastDate(14), realEnd = getPastDate(9), status = MilestoneStatus.COMPLETADO) }) { pid ->
+        if(pid != null) {
+            viewModel.addFeedback(pid, supervisorId, supervisorName, "SUPERVISOR", "Registro inicial y planeación finalizada.")
+            viewModel.addFeedback(pid, "revisor_id", "Ing. Calidad", "REVISOR", "Revisión técnica de hitos aprobada satisfactoriamente.")
+            viewModel.addFeedback(pid, "aprobador_id", "Gerencia Planta", "APROBADOR", "Proyecto liberado oficialmente para producción masiva.")
+        }
+    }
+
+    // 3. Ford - On Going
+    val ford = Product(classification = ProductClassification.TRANSFERENCIA_PRODUCTO, partNumber = "FRD-F150-CAM", serialNumber = "FD-990", description = "Cámara Reversa", provider = "Ford", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.ON_GOING)
+    viewModel.registerFullProduct(ford, templatesTrans.mapIndexed { i, n -> 
+        val status = if (i < 5) MilestoneStatus.COMPLETADO else if (i == 5) MilestoneStatus.ON_GOING else MilestoneStatus.PENDIENTE
+        val realStart = if (i <= 5) getPastDate(5-i) else null
+        val realEnd = if (i < 5) getPastDate(4-i) else null
+        Milestone(name = n, order = i, plannedStart = getPastDate(10-i), plannedEnd = getPastDate(8-i), realStart = realStart, realEnd = realEnd, status = status) 
+    }) { pid ->
+        if(pid != null) {
+            viewModel.addFeedback(pid, supervisorId, supervisorName, "SUPERVISOR", "Inicio de transferencia de línea de producción.")
+            viewModel.addFeedback(pid, "revisor_id", "Ing. Calidad", "REVISOR", "Cronograma de transferencia validado. Fase de ejecución iniciada.")
+        }
+    }
+
+    // 4. Subaru - Pre Revision
+    val subaru = Product(classification = ProductClassification.NUEVO_PRODUCTO, partNumber = "SUB-BRZ-STR", serialNumber = "SB-112", description = "Volante Deportivo", provider = "Subaru", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.PRE_REVISION)
+    viewModel.registerFullProduct(subaru, templatesNew.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getFutureDate(i+1), plannedEnd = getFutureDate(i+3)) }) { pid ->
+        if(pid != null) viewModel.addFeedback(pid, supervisorId, supervisorName, "SUPERVISOR", "Plan de hitos enviado para revisión inicial de fechas.")
+    }
+
+    // 5. Mazda - Final Revision
+    val mazda = Product(classification = ProductClassification.TRANSFERENCIA_PRODUCTO, partNumber = "MAZ-CX5-LED", serialNumber = "MZ-445", description = "Faro LED", provider = "Mazda", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.FINAL_REVISION)
+    viewModel.registerFullProduct(mazda, templatesTrans.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getPastDate(20-i), plannedEnd = getPastDate(18-i), realStart = getPastDate(19-i), realEnd = getPastDate(17-i), status = MilestoneStatus.COMPLETADO) }) { pid ->
+        if(pid != null) viewModel.addFeedback(pid, supervisorId, supervisorName, "SUPERVISOR", "Todas las actividades de transferencia completadas. Solicitud de cierre técnico enviada.")
+    }
+
+    // 6. Stellantis - Aprobación Final
+    val stellantis = Product(classification = ProductClassification.NUEVO_PRODUCTO, partNumber = "STL-RAM-SUSP", serialNumber = "ST-778", description = "Módulo Suspensión", provider = "Stellantis", supervisorName = supervisorName, supervisorId = supervisorId, status = ProductStatus.APROBACION_FINAL)
+    viewModel.registerFullProduct(stellantis, templatesNew.mapIndexed { i, n -> Milestone(name = n, order = i, plannedStart = getPastDate(30-i), plannedEnd = getPastDate(28-i), realStart = getPastDate(29-i), realEnd = getPastDate(27-i), status = MilestoneStatus.COMPLETADO) }) { pid ->
+        if(pid != null) {
+            viewModel.addFeedback(pid, "revisor_id", "Ing. Calidad", "REVISOR", "Validación técnica final completada. Proyecto listo para aprobación de gerencia.")
+        }
+    }
 }
 
 @Composable
@@ -156,11 +201,30 @@ fun AppleProductItem(product: Product, onClick: () -> Unit) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(product.partNumber, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("${product.provider} | ${product.classification.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Text("${product.provider} | ${product.classification.name.replace("_", " ")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 Text("Responsable: ${product.supervisorName}", style = MaterialTheme.typography.labelSmall)
             }
-            Surface(color = if(product.status == ProductStatus.COMPLETED) Color(0xFF34C759).copy(0.1f) else Color.Gray.copy(0.1f), shape = RoundedCornerShape(8.dp)) {
-                Text(product.status.name, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            Surface(
+                color = when(product.status) {
+                    ProductStatus.COMPLETED -> Color(0xFF34C759).copy(0.1f)
+                    ProductStatus.ON_GOING -> Color(0xFF007AFF).copy(0.1f)
+                    ProductStatus.RECHAZADO -> Color(0xFFFF3B30).copy(0.1f)
+                    else -> Color.Gray.copy(0.1f)
+                }, 
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    product.status.name.replace("_", " "), 
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), 
+                    style = MaterialTheme.typography.labelSmall, 
+                    fontWeight = FontWeight.Bold,
+                    color = when(product.status) {
+                        ProductStatus.COMPLETED -> Color(0xFF34C759)
+                        ProductStatus.ON_GOING -> Color(0xFF007AFF)
+                        ProductStatus.RECHAZADO -> Color(0xFFFF3B30)
+                        else -> Color.DarkGray
+                    }
+                )
             }
         }
     }
